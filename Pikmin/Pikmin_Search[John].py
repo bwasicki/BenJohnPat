@@ -1,0 +1,118 @@
+import time
+import wikipedia
+import xlsxwriter
+from bs4 import BeautifulSoup
+
+workbook = xlsxwriter.Workbook('1 degree of Wolfman.xlsx')
+worksheet = workbook.add_worksheet()
+
+wiki = wikipedia.WikipediaPage('Werewolf')
+targetWord = 'Wolfman'
+depth = 1
+pikmin = 0
+visited = set([])
+backlog = list()
+backlog.append(wiki.title)
+
+temp = list()
+seen = list()
+pages = list()
+
+
+
+def crawl():
+        start_time = time.time()
+        for i in range(0, depth+1):
+                queueLinks(backlog, i)
+        print('Queued ' + str(len(pages)) + ' pages!')
+        num = crawlHelper()
+        end_time = time.time()
+        print(targetWord + ' found ' + str(num) + ' times! ' + str(len(visited)) + ' pages visited.')
+        print("It took {} to execute this".format(hms_string(end_time - start_time)))
+        writeToXlsx()
+
+def crawlHelper():
+        num = 0
+        for page in pages:
+                if page.title not in visited:
+                        try:
+                                visited.add(page.title)
+                                print('Counting ' + targetWord + ' in ' + page.title + '...')
+                                text = makeSoup(page.title).get_text()
+                                numCount = countOccurences(text)
+                                num += numCount
+                                page.count = numCount
+                        except:
+                                print('Error on page: ' + page.title)
+        return num
+
+
+
+
+def queueLinks(links, degree):
+        for link in links:
+                if link not in seen:
+                        seen.append(link)
+                        pages.append(WikiPage(link, degree, targetWord, 0))
+                        try:
+                                print('Queueing ' + link + '...')
+                        except:
+                                print('Cannot print queued link')
+                        temp.append(link)
+        if (degree < depth):
+                backlog.clear()
+                print('Backlog cleared...')
+                for title in temp:
+                        print('Seaching for links in ' + title + '...')
+                        try:
+                                for link in wikipedia.WikipediaPage(title).links:
+                                        if link not in seen:
+                                               backlog.append(link)
+                        except:
+                                print('Error finding links on page: ' + title)
+                temp.clear()
+
+
+
+
+def countOccurences(text):
+        return text.lower().split().count(targetWord.lower())
+
+
+def makeSoup(title):
+        soup = wikipedia.WikipediaPage(title).html()
+        return BeautifulSoup(soup, 'html.parser')
+
+def printLinks(links):
+        for link in links:
+                print(link)
+
+def writeToXlsx():
+        print('Writing to xlsx...')
+        row = 0
+        col = 0
+        for page in pages:
+                worksheet.write(row, col, page.title)
+                worksheet.write(row, col+1, page.degree)
+                worksheet.write(row, col+2, page.targetWord)
+                worksheet.write(row, col+3, page.count)
+                row += 1
+        workbook.close()
+        print('Done!')
+
+def hms_string(sec_elapsed):
+    h = int(sec_elapsed / (60 * 60))
+    m = int((sec_elapsed % (60 * 60)) / 60)
+    s = sec_elapsed % 60.
+    return "{}:{:>02}:{:>05.2f}".format(h, m, s)
+# End hms_string
+
+
+
+class WikiPage():
+
+        def __init__(self, title, degree, targetWord, count):
+                self.title = title
+                self.degree = degree
+                self.targetWord = targetWord
+                self.count = count
